@@ -9,6 +9,17 @@ import youtube_client
 import socket # socket.gaierror
 import subprocess # subprocess.CalledProcessError
 
+from player import player
+
+
+
+listbox = None
+command_prompt = None
+status_bar = None
+main_frame = None
+client = None
+loop = None
+
 
 class VideoButton(urwid.FlowWidget):
     clicked_buttons = []
@@ -16,7 +27,7 @@ class VideoButton(urwid.FlowWidget):
     def __init__(self, video, index, color='index'):
         self.video = video
         self.index = index
-        info = ('normal', ' (' + self.video.author + ', ' + self.video.rating + ', ' + self.video.duration + ')')
+        info = ('normal', ' (%s, %s, %s)'% ( self.video.author, self.video.rating, self.video.duration ))
         self.title = urwid.Text([self.video.title, info])
         index = urwid.Text(('normal', ' ' + str(self.index) + '. '), align='right')
         index_width = 6
@@ -68,8 +79,9 @@ class VideoButton(urwid.FlowWidget):
             try:
                 self.video.stream()
                 status_bar.set_text(' Streamed: "' + self.video.title + '"')
-            except AttributeError:
+            except AttributeError as e:
                 status_bar.set_text(' Local videos do not support streaming yet')
+                raise e
             except subprocess.CalledProcessError:
                 status_bar.set_text(' You probably lost your internet connection')
                 main_frame.set_focus('body')
@@ -359,6 +371,12 @@ class VideoListBox(urwid.WidgetWrap):
                 self.listbox.set_focus(self.latest_search[self.latest_search_position])
             except TypeError:
                 pass
+        elif key == 'a':
+            player.play()
+            status_bar.set_text('Playing..')
+        elif key == 'z':
+            player.seek(5)
+            status_bar.set_text('Seeking..')
         else:
             return self.listbox.keypress(size, key)
 
@@ -373,7 +391,6 @@ def update(main_loop, user_data):
                 if button.video == video:
                     button.download_status.set_text(('downloading', video.dl.progress.rstrip()))
     main_loop.set_alarm_in(0.5, update)
-
 
 def main():
     # create the download directory if it doesn't already exist

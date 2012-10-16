@@ -6,15 +6,25 @@ import locale
 import download_thread
 import os
 
-
 locale.setlocale(locale.LC_ALL, '')
-
+from player import player
 
 class YouTubeClient:
     def __init__(self):
         self.yt_service = gdata.youtube.service.YouTubeService()
         self.max_results = 25
         self.last_search = None
+
+        self.yt_service.email = 'boobeksp@gmail.com'
+        self.yt_service.password = 'a123456'
+        #yt_service.source = 'my-example-application'
+        #yt_service.developer_key = 'ABC123...'
+        #yt_service.client_id = 'my-example-application'
+        self.yt_service.ProgrammaticLogin()
+        favorite_feed = self.yt_service.GetUserFavoritesFeed(username='boobekk')
+        from pprint import pprint
+        pprint(favorite_feed)
+
 
     def search(self, search_terms, page=1):
         self.last_search = [search_terms, page]
@@ -55,7 +65,7 @@ class YouTubeVideo:
         self.entry = entry
         self.title = entry.media.title.text
         self.download_process = None
-
+        self.player = player
         # replace slashes with html code &#47;
         self.filename = self.title.replace('/', '&#47;')
 
@@ -111,19 +121,28 @@ class YouTubeVideo:
     def get_formatted_views(self):
         return locale.format('%d', int(self.views), grouping=True)
 
-    def play(self):
-        devnull = open(os.devnull)
+    def play(self, displayVideo=False):
         extensions = ['.flv', '.mp4', '.webm']
         for ext in extensions:
             file = self.filename + ext
             if os.path.exists(file):
-                subprocess.Popen(['mplayer', '-msglevel', 'all=-1', '-use-filename-title', file], stdin=devnull)
+                ex = ['-use-filename-title']
+                if not displayVideo:
+                    ex.append('-novideo')
+
+                player.addToPlayList(ex, file)
+                #self.player.args = ex
+                #self.player.spawn()
+                #self.player.loadfile(file)
                 return True
         return False
 
-    def stream(self):
+    def stream(self, displayVideo=False):
         cookie = '/tmp/videotop_cookie'
         c1 = ['youtube-dl', '--get-url', '--max-quality=34', '--cookies=' + cookie, self.url]
         stream = subprocess.check_output(c1).strip()
-        c2 = ['mplayer', '-msgcolor', '-title', self.title, '-prefer-ipv4', '-cookies', '-cookies-file', cookie, stream]
-        subprocess.call(c2)
+        c2 = ['-prefer-ipv4', '-msgcolor', '-title', self.title]
+        if not displayVideo:
+            c2.append("-novideo")
+        c2.extend(['-cookies', '-cookies-file', cookie, stream])
+        self.player.addToPlayList(c2)
