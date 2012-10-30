@@ -37,6 +37,8 @@ the values depend on your internet connection:
 ## Command Table
 <table border='1'>
 <tr><th>Command Mode</th><th>Browse Mode</th><th>Description</th></tr>
+<tr><td>:login</td><td></td><td>login to youtube (:login email password at first time, later it's enough if you write the command without your account details.</td></tr>
+<tr><td>:playlist, :pl</td><td></td><td>get your playlists (you have to login before)</td></tr>
 <tr><td>:search, :s</td><td></td><td>Search for videos</td></tr>
 <tr><td>:videos, :v</td><td></td><td>Show all downloaded videos</td></tr>
 <tr><td>:13</td><td></td><td>Select video 13</td></tr>
