@@ -5,6 +5,12 @@ import subprocess
 import locale
 import download_thread
 import os
+import logging
+
+from pyqutie.config import SavedConfig
+cfg = SavedConfig("youtube");
+
+log = logging.getLogger("base.ytservice");
 
 locale.setlocale(locale.LC_ALL, '')
 from player import player
@@ -15,15 +21,9 @@ class YouTubeClient:
         self.max_results = 25
         self.last_search = None
 
-        self.yt_service.email = 'boobeksp@gmail.com'
-        self.yt_service.password = 'a123456'
-        #yt_service.source = 'my-example-application'
-        #yt_service.developer_key = 'ABC123...'
-        #yt_service.client_id = 'my-example-application'
-        self.yt_service.ProgrammaticLogin()
-        favorite_feed = self.yt_service.GetUserFavoritesFeed(username='boobekk')
-        from pprint import pprint
-        pprint(favorite_feed)
+        self.yt_service.developer_key = "AI39si7HTYNNRVgmteKq-kMGDfCFPrSJfMCux4zK39n_TocNSpyYPYclMv7NCzy8aIeLu1Q5cS_sh9i8iw6NZbCWip2GaElBWw"
+        self.yt_service.client_id = 'youtubeplayer'
+        self.yt_service.ssl = True
 
 
     def search(self, search_terms, page=1):
@@ -56,6 +56,31 @@ class YouTubeClient:
         group = gdata.media.Group(title=title)
         video_entry = gdata.youtube.YouTubeVideoEntry(media=group)
         return YouTubeVideo(video_entry)
+
+
+    def login(self, email=None, pwd=None):
+        if email is not None and pwd is not None:
+            cfg.email = email
+            cfg.pwd = pwd
+        else:
+            try:
+                email = cfg.email
+                pwd = cfg.pwd
+            except:
+                return
+        self.yt_service.email = email
+        self.yt_service.password = pwd
+        self.yt_service.source = 'youtubeplayer'
+        self.yt_service.ProgrammaticLogin()
+
+
+    def getUserPlayLists(self):
+        _pls = self.yt_service.GetYouTubePlaylistFeed()
+        pls = []
+        for entry in _pls.entry:
+            pl = YoutubePlayList(entry)
+            pls.append(pl)
+        return pls
 
 
 class YouTubeVideo:
@@ -138,11 +163,38 @@ class YouTubeVideo:
         return False
 
     def stream(self, displayVideo=False):
-        cookie = '/tmp/videotop_cookie'
-        c1 = ['youtube-dl', '--get-url', '--max-quality=34', '--cookies=' + cookie, self.url]
-        stream = subprocess.check_output(c1).strip()
-        c2 = ['-prefer-ipv4', '-msgcolor', '-title', self.title]
-        if not displayVideo:
-            c2.append("-novideo")
-        c2.extend(['-cookies', '-cookies-file', cookie, stream])
-        self.player.addToPlayList(c2)
+        self.pl = download_thread.StreamThread(self, displayVideo)
+        self.pl.start()
+
+
+class YoutubePlayList(object):
+    def __init__(self, entry):
+        self.entry = entry
+        log.info("Loading playlist %s" , entry.title.text)
+        self._playlist = None
+
+
+    def __getFullPlayList(self):
+        if self._playlist is None:
+            self._playlist = ytclient.yt_service.GetYouTubeVideoFeed(self.entry.feed_link[0].href)
+
+
+    def title(self):
+        return self.entry.title.text
+
+
+    def getVideos(self):
+        self.__getFullPlayList()
+        videos = []
+        for entry in self._playlist.entry:
+            videos.append(YouTubeVideo(entry))
+        return videos
+        
+
+
+ytclient = YouTubeClient()
+# ytclient.login("boobeksp@gmail.com", "a123456")
+# pls = ytclient.getUserPlayLists()
+# vids = pls[0].getVideos()
+# import pdb
+# pdb.set_trace()

@@ -1,17 +1,21 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
+from pyqutie import appmeta
+appmeta.name = 'VideoTop'
+appmeta.shortname = 'videotop'
+appmeta.appBase = __file__
+
 import os
 import errno
 import urwid
 import youtube_client
+from gdata.service import RequestError
 
 import socket # socket.gaierror
 import subprocess # subprocess.CalledProcessError
 
 from player import player
-
-
 
 listbox = None
 command_prompt = None
@@ -21,14 +25,9 @@ client = None
 loop = None
 
 
-class VideoButton(urwid.FlowWidget):
-    clicked_buttons = []
-
-    def __init__(self, video, index, color='index'):
-        self.video = video
+class ContentButton(urwid.FlowWidget):
+    def __init__(self, index, color='index'):
         self.index = index
-        info = ('normal', ' (%s, %s, %s)'% ( self.video.author, self.video.rating, self.video.duration ))
-        self.title = urwid.Text([self.video.title, info])
         index = urwid.Text(('normal', ' ' + str(self.index) + '. '), align='right')
         index_width = 6
         self.display_widget = urwid.Columns([('fixed', index_width, index), self.title])
@@ -42,6 +41,15 @@ class VideoButton(urwid.FlowWidget):
 
     def selectable(self):
         return True
+
+class VideoButton(ContentButton):
+    clicked_buttons = []
+
+    def __init__(self, video, index, color='index'):
+        self.video = video
+        info = ('normal', ' (%s, %s, %s)'% ( self.video.author, self.video.rating, self.video.duration ))
+        self.title = urwid.Text([self.video.title, info])
+        ContentButton.__init__(self, index, color)
 
     def keypress(self, size, key):
         if key == 'enter':
@@ -90,6 +98,27 @@ class VideoButton(urwid.FlowWidget):
         else:
             return key
 
+class PlayListButton(ContentButton):
+    
+    def __init__(self, playlist, index):
+        self.playlist = playlist
+        info = ('normal', ' (%s)'% ( self.playlist.title() ))
+        self.title = urwid.Text([self.playlist.title(), info])
+        ContentButton.__init__(self, index, color='playlist')
+
+
+    def keypress(self, size, key):
+        if key == 'enter':
+            status_bar.set_text(' Download playlist %s' % self.playlist.title())
+            videos = self.playlist.getVideos()
+            if videos != []:
+                listbox.append(videos)
+            else:
+                status_bar.set_text(' No videos in playlist: "' + self.playlist.title() + '"')
+            main_frame.set_focus('body')
+        else:
+            return key
+
 
 class CommandPrompt(urwid.Edit):
 
@@ -132,6 +161,8 @@ class CommandPrompt(urwid.Edit):
                     search = client.search(query)
                     if search != []:
                         listbox.append(search)
+                        # download_t
+                        # import pdb; pdb.set_trace()
                     else:
                         status_bar.set_text(' No results found for: "' + query + '"')
                     main_frame.set_focus('body')
@@ -141,6 +172,29 @@ class CommandPrompt(urwid.Edit):
                     main_frame.set_focus('body')
                 except socket.gaierror:
                     status_bar.set_text(' You probably lost your internet connection')
+                    main_frame.set_focus('body')
+            elif command[0] == "login":
+                try:
+                    (email, pwd) = command[1].split(" ")
+                    client.login(email, pwd)
+                except:
+                    client.login()
+                self.clear()
+                status_bar.set_text(' Try to login')
+                main_frame.set_focus('body')
+            elif command[0] in ('playlist', 'pl'):
+                try:
+                    self.clear()
+                    status_bar.set_text(' Getting playlists for user')
+                    loop.draw_screen()
+                    playlists = client.getUserPlayLists()
+                    listbox.appendPlaylists(playlists)
+                    main_frame.set_focus('body')
+                except socket.gaierror:
+                    status_bar.set_text(' You probably lost your internet connection')
+                    main_frame.set_focus('body')
+                except RequestError:
+                    status_bar.set_text(' You have to login to receive your playlists')
                     main_frame.set_focus('body')
             elif command[0] in ('videos', 'v'):
                 self.clear()
@@ -248,10 +302,25 @@ class VideoListBox(urwid.WidgetWrap):
             index = int(len(self.body)) - self.dividers + 1
             new_button = VideoButton(video, index, color)
             self.body.append(new_button)
-
         # move cursor to the first video of the search
         search_begin = len(self.body) - len(search)
         self.set_focus(search_begin)
+
+
+    def appendPlaylists(self, playlists):
+        # add separator if listbox not empty
+        if len(self.body):
+            self.body.append(urwid.Divider('-'))
+            self.dividers += 1
+        
+        for playlist in playlists:
+            index = int(len(self.body)) - self.dividers + 1
+            new_button = PlayListButton(playlist, index)
+            self.body.append(new_button)
+
+        search_begin = len(self.body) - len(playlists)
+        self.set_focus(search_begin)
+
 
     def get_real_index(self, index):
         # get the real index ignoring divider widgets
@@ -413,6 +482,7 @@ def main():
               ('downloaded', 'light green', 'black'),
               ('downloading', 'light blue', 'black'),
               ('video', 'dark cyan', 'black'),
+              ('playlist', 'dark green', 'black'),
               ('deleted', 'dark gray', 'black'),
               ('deleted_focus', 'dark red', 'black'),
               ('normal', 'light gray', 'black')]
@@ -431,7 +501,10 @@ def main():
     footer = urwid.Pile([urwid.AttrMap(status_bar, 'status'), command_prompt])
     main_frame = urwid.Frame(listbox)
     main_frame.set_footer(footer)
-    client = youtube_client.YouTubeClient()
+    client = youtube_client.ytclient
+
+    # TODO remove this line
+    # client.login("boobeksp@gmail.com", "a123456")
 
     loop = urwid.MainLoop(main_frame, palette)
     loop.set_alarm_in(0, update)

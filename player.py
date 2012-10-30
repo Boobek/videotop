@@ -4,86 +4,141 @@ from threading import Timer
 import time
 
 
-class Player(object):
-    def __init__(self):
+class BasePlayer(object):
+    def __init__(self, playEndedCallback):
         self.isPlaying = False
-        self.player = MPlayer(autospawn=False)
-        self.playlist = []
-        self.current = 0
+        self.mplayer = MPlayer(autospawn=False)
 
         self.timer = Timer(interval=1, function=Player.loop, args=[self])
-        #self.thread.daemon = True
         self.timer.start()
 
-
-    def play(self):
-        self.isPlaying = True
-        self.__play()
+        self.playEndedCallback = playEndedCallback
 
 
     def stop(self):
         self.isPlaying = False
-        self.player.stop()
+        self.mplayer.stop()
 
 
     def pause_resume(self):
-        self.player.pause()
+        self.mplayer.pause()
 
 
     def seek(self, amount):
-        if self.player.time_pos:
-            self.player.time_pos += amount
+        if self.mplayer.time_pos:
+            self.mplayer.time_pos += amount
 
 
-    def __play(self):
-        if len(self.playlist) > self.current:
-            args = self.playlist[self.current][0]
-            mediafile = self.playlist[self.current][1]
-            self.player.args = args
-            self.player.spawn()
-            if mediafile:
-                self.player.loadfile(mediafile)
+    def play(self, mediafile):
+        self.isPlaying = True
+        args = []
+        self.mplayer.args = args
+        self.mplayer.spawn()
+        if mediafile:
+            self.mplayer.loadfile(mediafile)
+        
 
 
-    def playNext(self):
-        if len(self.playlist) > self.current:
-            self.current += 1
-            self.play()
+    def quit(self):
+        self.isPlaying = False
+        self.timer.cancel()
+        self.mplayer.quit()
+        print "timer cancelled"
 
 
     @classmethod
     def loop(cls, player):
+
+        #return if not playing
+        if not player.isPlaying: return
+
         t = Timer(1, cls.loop, [player])
         t.start()
 
-        if not player.isPlaying: return
+        # from videotop import status_bar
+        # status_bar.set_text("%s/%s -- curr: %s" % ( player.player.length, player.player.time_pos, player.current))
 
-        from videotop import status_bar
-        status_bar.set_text("%s/%s -- curr: %s" % ( player.player.length, player.player.time_pos, player.current))
-
-        if player.player.length != None and player.current < len(player.playlist):
+        # print("%s/%s -- curr: %s" % ( player.mplayer.length, player.mplayer.time_pos, player.current))
+        if player.mplayer.length != None:
             time.sleep(1000)
-            print player.player.length
         else:
-            player.playNext()
-
-
-    def addToPlayList(self, args, mediafile=None):
-        self.playlist.append( [args, mediafile])
-
+            player.playEndedCallback()
+            t.cancel()
 
     def __del__(self):
-        self.timer.cancel()
-        self.player.quit()
+        self.quit()
+
+
+class PlayList(object):
+    def __init__ (self):
+        self.list = []
+        self.currentIdx = 0
+    
+    def next(self):
+        self.currentIdx += 1
+        return self.current()
+
+
+    def prev(self):
+        self.currentIdx -= 1
+        return self.current()
+
+
+    def current (self):
+        if self.currentIdx > len(self.list) - 1:
+            self.currentIdx = 0
+        elif self.currentIdx < 0:
+            self.currentIdx = len(self.list) - 1
+        return self.list[self.currentIdx]
+
+
+    def append(self, mediafile):
+        self.list.append(mediafile)
+
+
+    def size(self):
+        return len(self.list)
+
+
+class Player(BasePlayer):
+    def __init__(self):
+        BasePlayer.__init__(self, self.__playEnded)
+        self.playlist = PlayList()
+
+
+    def play(self):
+        BasePlayer.play(self, self.playlist.current())
+
+
+    def next(self):
+        BasePlayer.play(self, self.playlist.next())
+
+
+    def prev(self):
+        BasePlayer.play(self, self.playlist.prev())
+
+
+    def getPlayList(self):
+        return self.playlist
+
+
+    def __playEnded(self):
+        self.next()
+
 
 player = Player()
 
 if __name__ == '__main__':
     import os
     os.chdir("/home/boo/.videotop/videos")
+    playlist = player.getPlayList()
     for f in os.listdir(".")[:2]:
-        player.addToPlayList(["-fs"], f)
+        # player.addToPlayList(["-fs"], f)
+        # player.addToPlayList([], f)
+        playlist.append(f)
         #print "FILE", f
     from pprint import pprint
     pprint (player.playlist)
     player.play()
+    from pdb import set_trace
+    set_trace()
