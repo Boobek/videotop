@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
-from pyqutie import appmeta
+from minipyfw import appmeta
 appmeta.name = 'VideoTop'
 appmeta.shortname = 'videotop'
 appmeta.appBase = __file__

@@ -61,12 +61,14 @@ the values depend on your internet connection:
 ## Dependencies
 * [urwid][1] to provide an ncurses frontend.
 * [gdata][2] and [youtube-dl][3] to search for and download youtube videos.
+* [minipyfw][5] for configuration and more later
 * (optional) [mplayer][4] to play the downloaded videos.
 
 [1]: http://excess.org/urwid/
 [2]: http://code.google.com/apis/youtube/1.0/developers_guide_python.html
 [3]: http://rg3.github.com/youtube-dl/
 [4]: http://www.mplayerhq.hu/
+[5]: https://github.com/Boobek/minipyfw
 
 ## Links
 * [archlinux forums][5]
